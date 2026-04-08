@@ -34,6 +34,7 @@ import QuizSection from './components/QuizSection';
 import MathStars from './components/games/MathStars';
 import WordBlocks from './components/games/WordBlocks';
 import { speakText } from './services/gemini';
+import { isAIConnected } from './services/gemini';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
@@ -102,7 +103,7 @@ const AbstractShapes = () => (
 );
 
 // Pages
-const Home = ({ currentChild, games }: { currentChild: ChildProfile | null, games: any[] }) => {
+const Home = ({ currentChild, games, aiConnected }: { currentChild: ChildProfile | null, games: any[], aiConnected: boolean }) => {
   const navigate = useNavigate();
 
   if (!currentChild) {
@@ -134,6 +135,14 @@ const Home = ({ currentChild, games }: { currentChild: ChildProfile | null, game
         <p className="text-2xl font-bold text-white drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
           مستعد لمغامرة جديدة في سن الـ {currentChild.age}؟
         </p>
+        
+        {!aiConnected && (
+          <div className="bg-brand-red/20 border-2 border-brand-red p-4 max-w-md mx-auto mt-4 text-white font-bold">
+            ⚠️ تنبيه: الذكاء الاصطناعي غير متصل. سيتم استخدام المحتوى الاحتياطي.
+            <br/>
+            <span className="text-sm font-normal opacity-80">يرجى التأكد من إعداد GEMINI_API_KEY في إعدادات النشر (Environment Variables).</span>
+          </div>
+        )}
         
         <div className="flex justify-center gap-4 mt-8">
           <button 
@@ -206,7 +215,7 @@ const GameView = ({ currentChild, games, onUpdateProgress }: { currentChild: Chi
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
 
-  if (!currentChild) return <Home currentChild={null} games={games} />;
+  if (!currentChild) return <Home currentChild={null} games={games} aiConnected={false} />;
   if (!game) return (
     <div className="text-center py-20 space-y-4">
       <h2 className="text-3xl font-bold text-white">عذراً، اللعبة غير موجودة</h2>
@@ -529,8 +538,15 @@ export default function App() {
   const [games, setGames] = useState<any[]>(GAMES);
   const [loading, setLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [aiConnected, setAiConnected] = useState(false);
 
   useEffect(() => {
+    const checkAI = async () => {
+      const connected = await isAIConnected();
+      setAiConnected(connected);
+    };
+    checkAI();
+
     const fetchGames = async () => {
       try {
         const gamesSnap = await getDocs(collection(db, 'games'));
@@ -698,6 +714,10 @@ export default function App() {
                   <LayoutDashboard className="w-6 h-6" />
                   <span className="hidden md:block">لوحة الوالدين</span>
                 </Link>
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-white border-2 border-black text-xs font-bold">
+                  <div className={cn("w-2 h-2 rounded-full", aiConnected ? "bg-green-500" : "bg-red-500")} />
+                  <span>AI: {aiConnected ? "متصل" : "غير متصل"}</span>
+                </div>
                 <button 
                   onClick={handleLogout}
                   className="p-3 border-2 border-black bg-brand-red text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
@@ -712,13 +732,13 @@ export default function App() {
           <main className="flex-1 max-w-7xl mx-auto px-4 py-12 w-full relative">
             <AnimatePresence mode="wait">
               <Routes>
-                <Route path="/" element={<Home currentChild={currentChild} games={games} />} />
-                <Route path="/games" element={<Home currentChild={currentChild} games={games} />} />
+                <Route path="/" element={<Home currentChild={currentChild} games={games} aiConnected={aiConnected} />} />
+                <Route path="/games" element={<Home currentChild={currentChild} games={games} aiConnected={aiConnected} />} />
                 <Route path="/game/:id" element={<GameView currentChild={currentChild} games={games} onUpdateProgress={updateProgress} />} />
                 <Route path="/quizzes" element={<QuizSection age={currentChild?.age || 6} level={currentChild?.level || 1} onComplete={updateProgress} />} />
                 <Route path="/parent" element={<ParentDashboard user={user} setUser={setUser} />} />
                 <Route path="/stories" element={<StoryTime age={currentChild?.age || 6} onComplete={() => updateProgress(20)} />} />
-                <Route path="*" element={<Home currentChild={currentChild} games={games} />} />
+                <Route path="*" element={<Home currentChild={currentChild} games={games} aiConnected={aiConnected} />} />
               </Routes>
             </AnimatePresence>
           </main>
