@@ -68,6 +68,16 @@ service cloud.firestore {
       allow write: if isAdmin() && isValidGame(request.resource.data);
     }
 
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      // Only system/admin can create notifications (for demo, we allow user to create for themselves)
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      // Users can mark their own notifications as read
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

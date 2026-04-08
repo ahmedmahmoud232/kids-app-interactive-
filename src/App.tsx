@@ -37,9 +37,11 @@ import MathStars from './components/games/MathStars';
 import WordBlocks from './components/games/WordBlocks';
 import { speakText } from './services/gemini';
 import { isAIConnected } from './services/gemini';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType, messaging } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, where, orderBy, limit, addDoc, Timestamp } from 'firebase/firestore';
+import { NotificationProvider, useNotifications } from './components/NotificationProvider';
+import { Bell } from 'lucide-react';
 
 // Sound Utility
 const playSound = (type: 'click' | 'success' | 'pop' | 'level-up') => {
@@ -545,6 +547,18 @@ const ParentDashboard = ({ user, setUser }: { user: UserProfile, setUser: React.
 };
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <NotificationProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </NotificationProvider>
+    </ErrorBoundary>
+  );
+}
+
+const AppContent = () => {
   const [user, setUser] = useState<UserProfile>({
     currentChildId: null,
     children: []
@@ -553,6 +567,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [aiConnected, setAiConnected] = useState(false);
+  const { showNotification } = useNotifications();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkAI = async () => {
@@ -606,12 +622,36 @@ export default function App() {
           handleFirestoreError(error, OperationType.GET, `users/${fUser.uid}`);
         }
       } else {
-        setGames(GAMES); // Fallback to hardcoded games
+        setGames(GAMES);
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (firebaseUser) {
+      // Listen for new notifications in Firestore
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', firebaseUser.uid),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            showNotification(data.title, data.message, data.type);
+          }
+        });
+      });
+
+      return () => unsubscribe();
+    }
+  }, [firebaseUser, showNotification]);
 
   const currentChild = user.children.find(c => c.id === user.currentChildId) || null;
 
@@ -707,12 +747,9 @@ export default function App() {
       </div>
     );
   }
-
   return (
-    <ErrorBoundary>
-      <Router>
-        <div className="min-h-screen flex flex-col font-sans">
-          {/* Navigation */}
+    <div className="min-h-screen flex flex-col font-sans">
+      {/* Navigation */}
           <nav className="bg-white border-b-4 border-black sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 h-24 flex items-center justify-between">
               <Link to="/" className="flex items-center gap-3">
@@ -732,6 +769,7 @@ export default function App() {
                 <Link to="/stories" className="p-3 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
                   <BookOpen className="w-7 h-7" />
                 </Link>
+                <NotificationBell />
                 <div className="w-1 h-10 bg-black mx-2" />
                 <Link to="/parent" className="flex items-center gap-2 px-6 py-3 bg-brand-purple text-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black">
                   <LayoutDashboard className="w-6 h-6" />
@@ -773,10 +811,54 @@ export default function App() {
             </div>
           </footer>
         </div>
-      </Router>
-    </ErrorBoundary>
   );
-}
+};
+
+const NotificationBell = () => {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { showNotification } = useNotifications();
+
+  useEffect(() => {
+    if (auth.currentUser) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', auth.currentUser.uid),
+        where('read', '==', false)
+      );
+      return onSnapshot(q, (snap) => setUnreadCount(snap.size));
+    }
+  }, []);
+
+  const sendTestNotification = async () => {
+    if (!auth.currentUser) return;
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: auth.currentUser.uid,
+        title: 'مرحباً بك!',
+        message: 'تم تفعيل نظام التنبيهات بنجاح.',
+        type: 'success',
+        createdAt: new Date().toISOString(),
+        read: false
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <button 
+      onClick={sendTestNotification}
+      className="relative p-3 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+    >
+      <Bell className="w-7 h-7" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-2 -right-2 w-6 h-6 bg-brand-red text-white border-2 border-black rounded-full flex items-center justify-center text-xs font-black">
+          {unreadCount}
+        </span>
+      )}
+    </button>
+  );
+};
 
 function Placeholder({ title, color }: { title: string, color: string }) {
   return (

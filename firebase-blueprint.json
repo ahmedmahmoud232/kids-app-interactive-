@@ -42,6 +42,20 @@
         "icon": { "type": "string" }
       },
       "required": ["id", "title", "description", "category", "minAge", "maxAge", "color", "icon"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification for updates",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "error"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["userId", "title", "message", "type", "createdAt"]
     }
   },
   "firestore": {
@@ -52,6 +66,10 @@
     "/games/{gameId}": {
       "schema": "Game",
       "description": "Global games library"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User-specific notifications"
     }
   }
 }
