@@ -47,5 +47,25 @@ export const GAMES: Game[] = [
     maxAge: 13,
     color: 'bg-brand-purple',
     icon: 'Cpu'
+  },
+  {
+    id: 'science-lab',
+    title: 'مختبر العلوم',
+    description: 'اكتشف أسرار الكواكب والنجوم في رحلة فضائية',
+    category: 'science',
+    minAge: 6,
+    maxAge: 12,
+    color: 'bg-brand-green',
+    icon: 'FlaskConical'
+  },
+  {
+    id: 'language-safari',
+    title: 'مغامرة الحروف',
+    description: 'استكشف غابة الحروف وكون جملك الأولى',
+    category: 'language',
+    minAge: 4,
+    maxAge: 8,
+    color: 'bg-brand-red',
+    icon: 'Languages'
   }
 ];

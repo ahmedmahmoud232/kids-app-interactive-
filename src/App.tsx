@@ -12,12 +12,14 @@ import {
   ChevronLeft,
   LayoutDashboard,
   LogOut,
-  Play
+  Play,
+  Brain
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { GAMES, UserProfile } from './types';
 import MathGame from './components/MathGame';
 import StoryTime from './components/StoryTime';
+import QuizSection from './components/QuizSection';
 
 // Pages
 const Home = () => {
@@ -277,6 +279,9 @@ export default function App() {
               <Link to="/games" className="p-2 hover:bg-gray-50 rounded-xl transition-colors group">
                 <Gamepad2 className="w-6 h-6 text-gray-400 group-hover:text-brand-blue" />
               </Link>
+              <Link to="/quizzes" className="p-2 hover:bg-gray-50 rounded-xl transition-colors group">
+                <Brain className="w-6 h-6 text-gray-400 group-hover:text-brand-purple" />
+              </Link>
               <Link to="/stories" className="p-2 hover:bg-gray-50 rounded-xl transition-colors group">
                 <BookOpen className="w-6 h-6 text-gray-400 group-hover:text-brand-green" />
               </Link>
@@ -299,6 +304,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/games" element={<Home />} />
               <Route path="/game/:id" element={<GameView user={user} onUpdateProgress={updateProgress} />} />
+              <Route path="/quizzes" element={<QuizSection age={user.age} level={user.level} onComplete={updateProgress} />} />
               <Route path="/parent" element={<ParentDashboard user={user} setUser={setUser} />} />
               <Route path="/stories" element={<StoryTime age={user.age} onComplete={() => updateProgress(20)} />} />
               <Route path="/videos" element={<Placeholder title="فيديوهات تعليمية" color="bg-brand-red" />} />
