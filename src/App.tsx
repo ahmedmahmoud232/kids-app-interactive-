@@ -38,7 +38,7 @@ import WordBlocks from './components/games/WordBlocks';
 import AdminNotifications from './components/AdminNotifications';
 import { speakText } from './services/gemini';
 import { isAIConnected } from './services/gemini';
-import { auth, db, googleProvider, handleFirestoreError, OperationType, messaging } from './firebase';
+import { auth, db, googleProvider, handleFirestoreError, OperationType, messaging, requestNotificationPermission } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection, getDocs, query, where, orderBy, limit, addDoc, Timestamp } from 'firebase/firestore';
 import { NotificationProvider, useNotifications } from './components/NotificationProvider';
@@ -612,10 +612,18 @@ const AppContent = () => {
         try {
           const docRef = doc(db, 'users', fUser.uid);
           const docSnap = await getDoc(docRef);
+          
+          // Request notification permission and store token
+          const fcmToken = await requestNotificationPermission();
+          
           if (docSnap.exists()) {
-            setUser(docSnap.data() as UserProfile);
+            const userData = docSnap.data() as UserProfile;
+            if (fcmToken && userData.fcmToken !== fcmToken) {
+              await setDoc(docRef, { ...userData, fcmToken }, { merge: true });
+            }
+            setUser(userData);
           } else {
-            const initialProfile = { currentChildId: null, children: [] };
+            const initialProfile = { currentChildId: null, children: [], fcmToken };
             await setDoc(docRef, initialProfile);
             setUser(initialProfile);
           }
@@ -822,48 +830,90 @@ const AppContent = () => {
 };
 
 const NotificationBell = () => {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { showNotification } = useNotifications();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     if (auth.currentUser) {
       const q = query(
         collection(db, 'notifications'),
         where('userId', '==', auth.currentUser.uid),
-        where('read', '==', false)
+        orderBy('createdAt', 'desc'),
+        limit(10)
       );
-      return onSnapshot(q, (snap) => setUnreadCount(snap.size));
+      return onSnapshot(q, (snap) => {
+        setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
     }
   }, []);
 
-  const sendTestNotification = async () => {
-    if (!auth.currentUser) return;
+  const markAsRead = async (id: string) => {
     try {
-      await addDoc(collection(db, 'notifications'), {
-        userId: auth.currentUser.uid,
-        title: 'مرحباً بك!',
-        message: 'تم تفعيل نظام التنبيهات بنجاح.',
-        type: 'success',
-        createdAt: new Date().toISOString(),
-        read: false
-      });
+      await setDoc(doc(db, 'notifications', id), { read: true }, { merge: true });
     } catch (error) {
       console.error(error);
     }
   };
 
   return (
-    <button 
-      onClick={sendTestNotification}
-      className="relative p-3 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
-    >
-      <Bell className="w-7 h-7" />
-      {unreadCount > 0 && (
-        <span className="absolute -top-2 -right-2 w-6 h-6 bg-brand-red text-white border-2 border-black rounded-full flex items-center justify-center text-xs font-black">
-          {unreadCount}
-        </span>
-      )}
-    </button>
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-3 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+      >
+        <Bell className="w-7 h-7" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-2 -right-2 w-6 h-6 bg-brand-red text-white border-2 border-black rounded-full flex items-center justify-center text-xs font-black">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute left-0 mt-4 w-80 bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] z-50 overflow-hidden"
+            >
+              <div className="p-4 border-b-4 border-black bg-brand-purple text-white font-black flex justify-between items-center">
+                <span>الإشعارات</span>
+                <span className="text-xs bg-black/20 px-2 py-1 rounded">أحدث 10</span>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 font-bold">لا توجد إشعارات حالياً</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div 
+                      key={n.id} 
+                      className={cn(
+                        "p-4 border-b-2 border-black last:border-0 hover:bg-gray-50 transition-colors cursor-pointer",
+                        !n.read && "bg-brand-yellow/10"
+                      )}
+                      onClick={() => markAsRead(n.id)}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="font-black text-sm">{n.title}</h4>
+                        {!n.read && <div className="w-2 h-2 bg-brand-red rounded-full shrink-0 mt-1" />}
+                      </div>
+                      <p className="text-xs font-bold text-gray-600 mt-1">{n.message}</p>
+                      <span className="text-[10px] text-gray-400 mt-2 block">
+                        {new Date(n.createdAt).toLocaleDateString('ar-EG')}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 

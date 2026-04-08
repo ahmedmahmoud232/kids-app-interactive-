@@ -15,6 +15,7 @@ export default function AdminNotifications() {
   const [type, setType] = useState<'info' | 'success' | 'error'>('info');
   const [sending, setSending] = useState(false);
   const { showNotification } = useNotifications();
+  const isVapidConfigured = !!import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -54,11 +55,11 @@ export default function AdminNotifications() {
           addDoc(collection(db, 'notifications'), { ...notificationData, userId: user.id })
         );
         await Promise.all(promises);
-        showNotification('تم الإرسال', `تم إرسال التنبيه إلى ${users.length} مستخدم`, 'success');
+        showNotification('تم الإرسال', `تم إرسال التنبيه إلى ${users.length} مستخدم (بما في ذلك تنبيهات الجوال)`, 'success');
       } else {
         // Send to specific user
         await addDoc(collection(db, 'notifications'), { ...notificationData, userId: selectedUser });
-        showNotification('تم الإرسال', 'تم إرسال التنبيه بنجاح', 'success');
+        showNotification('تم الإرسال', 'تم إرسال التنبيه بنجاح للجهاز المختار', 'success');
       }
 
       setTitle('');
@@ -86,6 +87,16 @@ export default function AdminNotifications() {
         <p className="text-xl font-bold text-white">أرسل تحديثات فورية لمستخدمي نبراس</p>
       </div>
 
+      {!isVapidConfigured && (
+        <div className="bento-card p-6 bg-brand-red text-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center gap-4">
+          <AlertCircle className="w-10 h-10 shrink-0" />
+          <div className="space-y-1">
+            <h3 className="text-xl font-black">تنبيه: نظام إشعارات الجوال غير مكتمل</h3>
+            <p className="font-bold">يرجى إضافة مفتاح VAPID في إعدادات التطبيق (Settings) لتتمكن من إرسال تنبيهات مباشرة للجوال.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Form Section */}
         <div className="md:col-span-2 bento-card p-8 bg-white space-y-6">
@@ -104,7 +115,9 @@ export default function AdminNotifications() {
               >
                 <option value="all">جميع المستخدمين ({users.length})</option>
                 {users.map(u => (
-                  <option key={u.id} value={u.id}>مستخدم: {u.id.substring(0, 8)}...</option>
+                  <option key={u.id} value={u.id}>
+                    {u.id.substring(0, 8)}... {u.fcmToken ? '📱 (مفعل)' : '💻 (متصفح فقط)'}
+                  </option>
                 ))}
               </select>
             </div>
