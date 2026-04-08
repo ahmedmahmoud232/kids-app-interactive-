@@ -13,13 +13,28 @@ import {
   LayoutDashboard,
   LogOut,
   Play,
-  Brain
+  Brain,
+  FlaskConical,
+  Languages,
+  Cpu,
+  Square
 } from 'lucide-react';
+
+const IconMap: Record<string, any> = {
+  Star,
+  Square,
+  Cpu,
+  FlaskConical,
+  Languages,
+  Gamepad2
+};
 import { cn } from './lib/utils';
 import { GAMES, UserProfile } from './types';
 import MathGame from './components/MathGame';
 import StoryTime from './components/StoryTime';
 import QuizSection from './components/QuizSection';
+import MathStars from './components/games/MathStars';
+import WordBlocks from './components/games/WordBlocks';
 
 // Pages
 const Home = () => {
@@ -37,31 +52,34 @@ const Home = () => {
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {GAMES.map((game, index) => (
-          <motion.div
-            key={game.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Link to={`/game/${game.id}`} className="block group">
-              <div className={cn(
-                "kids-card p-8 h-full flex flex-col items-center text-center space-y-4",
-                "group-hover:border-brand-blue"
-              )}>
-                <div className={cn("p-6 rounded-full", game.color)}>
-                  <Gamepad2 className="w-12 h-12 text-white" />
+        {GAMES.map((game, index) => {
+          const Icon = IconMap[game.icon] || Gamepad2;
+          return (
+            <motion.div
+              key={game.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Link to={`/game/${game.id}`} className="block group">
+                <div className={cn(
+                  "kids-card p-8 h-full flex flex-col items-center text-center space-y-4",
+                  "group-hover:border-brand-blue"
+                )}>
+                  <div className={cn("p-6 rounded-full", game.color)}>
+                    <Icon className="w-12 h-12 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold">{game.title}</h3>
+                  <p className="text-gray-600">{game.description}</p>
+                  <div className="flex items-center gap-2 text-sm font-medium text-brand-purple bg-purple-50 px-4 py-1 rounded-full">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span>سن {game.minAge}-{game.maxAge}</span>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-bold">{game.title}</h3>
-                <p className="text-gray-600">{game.description}</p>
-                <div className="flex items-center gap-2 text-sm font-medium text-brand-purple bg-purple-50 px-4 py-1 rounded-full">
-                  <Star className="w-4 h-4 fill-current" />
-                  <span>سن {game.minAge}-{game.maxAge}</span>
-                </div>
-              </div>
-            </Link>
-          </motion.div>
-        ))}
+              </Link>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
@@ -73,7 +91,32 @@ const GameView = ({ user, onUpdateProgress }: { user: UserProfile, onUpdateProgr
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
 
-  if (!game) return <div>اللعبة غير موجودة</div>;
+  if (!game) return (
+    <div className="text-center py-20 space-y-4">
+      <h2 className="text-3xl font-bold">عذراً، اللعبة غير موجودة</h2>
+      <button onClick={() => navigate('/')} className="btn-kids bg-brand-purple text-white">العودة للرئيسية</button>
+    </div>
+  );
+
+  const renderGame = () => {
+    switch (id) {
+      case 'math-stars':
+        return <MathStars onComplete={(p) => { onUpdateProgress(p); setIsPlaying(false); }} />;
+      case 'word-blocks':
+        return <WordBlocks onComplete={(p) => { onUpdateProgress(p); setIsPlaying(false); }} />;
+      default:
+        return (
+          <MathGame 
+            age={user.age} 
+            level={user.level} 
+            onComplete={(points) => {
+              onUpdateProgress(points);
+              setIsPlaying(false);
+            }} 
+          />
+        );
+    }
+  };
 
   if (isPlaying) {
     return (
@@ -85,14 +128,7 @@ const GameView = ({ user, onUpdateProgress }: { user: UserProfile, onUpdateProgr
           <ChevronLeft className="w-5 h-5" />
           <span>إنهاء اللعبة</span>
         </button>
-        <MathGame 
-          age={user.age} 
-          level={user.level} 
-          onComplete={(points) => {
-            onUpdateProgress(points);
-            setIsPlaying(false);
-          }} 
-        />
+        {renderGame()}
       </div>
     );
   }
@@ -308,6 +344,7 @@ export default function App() {
               <Route path="/parent" element={<ParentDashboard user={user} setUser={setUser} />} />
               <Route path="/stories" element={<StoryTime age={user.age} onComplete={() => updateProgress(20)} />} />
               <Route path="/videos" element={<Placeholder title="فيديوهات تعليمية" color="bg-brand-red" />} />
+              <Route path="*" element={<Home />} />
             </Routes>
           </AnimatePresence>
         </main>
