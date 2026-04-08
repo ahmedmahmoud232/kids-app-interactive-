@@ -35,6 +35,7 @@ import StoryTime from './components/StoryTime';
 import QuizSection from './components/QuizSection';
 import MathStars from './components/games/MathStars';
 import WordBlocks from './components/games/WordBlocks';
+import AdminNotifications from './components/AdminNotifications';
 import { speakText } from './services/gemini';
 import { isAIConnected } from './services/gemini';
 import { auth, db, googleProvider, handleFirestoreError, OperationType, messaging } from './firebase';
@@ -770,6 +771,11 @@ const AppContent = () => {
                   <BookOpen className="w-7 h-7" />
                 </Link>
                 <NotificationBell />
+                {firebaseUser?.email === "ahmedmahmoud22990@gmail.com" && (
+                  <Link to="/admin/notifications" className="p-3 border-2 border-black bg-brand-yellow shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all" title="إدارة التنبيهات">
+                    <Bell className="w-7 h-7" />
+                  </Link>
+                )}
                 <div className="w-1 h-10 bg-black mx-2" />
                 <Link to="/parent" className="flex items-center gap-2 px-6 py-3 bg-brand-purple text-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black">
                   <LayoutDashboard className="w-6 h-6" />
@@ -798,6 +804,7 @@ const AppContent = () => {
                 <Route path="/game/:id" element={<GameView currentChild={currentChild} games={games} onUpdateProgress={updateProgress} />} />
                 <Route path="/quizzes" element={<QuizSection age={currentChild?.age || 6} level={currentChild?.level || 1} onComplete={updateProgress} />} />
                 <Route path="/parent" element={<ParentDashboard user={user} setUser={setUser} />} />
+                <Route path="/admin/notifications" element={firebaseUser?.email === "ahmedmahmoud22990@gmail.com" ? <AdminNotifications /> : <Home currentChild={currentChild} games={games} aiConnected={aiConnected} />} />
                 <Route path="/stories" element={<StoryTime age={currentChild?.age || 6} onComplete={() => updateProgress(20)} />} />
                 <Route path="*" element={<Home currentChild={currentChild} games={games} aiConnected={aiConnected} />} />
               </Routes>
