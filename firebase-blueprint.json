@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account containing multiple children profiles",
+      "type": "object",
+      "properties": {
+        "currentChildId": { "type": "string" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/entities/ChildProfile" }
+        }
+      },
+      "required": ["children"]
+    },
+    "ChildProfile": {
+      "title": "ChildProfile",
+      "description": "Individual child profile data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "age": { "type": "number" },
+        "level": { "type": "number" },
+        "points": { "type": "number" },
+        "progress": { "type": "object" }
+      },
+      "required": ["id", "name", "age", "level", "points"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Root user document containing all children data"
+    }
+  }
+}

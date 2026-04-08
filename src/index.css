@@ -7,20 +7,37 @@
   --color-brand-blue: #6BCBFF;
   --color-brand-green: #6BCB77;
   --color-brand-red: #FF6B6B;
-  --color-brand-purple: #9D72FF;
+  --color-brand-purple: #7C4DFF;
+  --color-brand-bg: #5E5CE6;
 }
 
 @layer base {
   body {
-    @apply bg-[#F8F9FA] text-[#2D3436] antialiased min-h-screen;
+    @apply bg-brand-bg text-[#1a1a1a] antialiased min-h-screen;
     direction: rtl;
   }
 }
 
-.kids-card {
-  @apply bg-white rounded-3xl shadow-lg border-4 border-transparent transition-all duration-300 hover:scale-105 hover:shadow-xl;
+.bento-card {
+  @apply bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-none transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none;
 }
 
-.btn-kids {
-  @apply px-6 py-3 rounded-2xl font-bold text-lg transition-all active:scale-95 shadow-md hover:shadow-lg;
+.abstract-shape {
+  @apply absolute pointer-events-none;
+}
+
+.semi-circle {
+  @apply w-24 h-12 bg-brand-purple/30 rounded-t-full border-2 border-black;
+}
+
+.yellow-circle {
+  @apply w-12 h-12 bg-brand-yellow rounded-full border-2 border-black;
+}
+
+.btn-bento {
+  @apply px-6 py-3 border-2 border-black bg-white font-bold text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all;
+}
+
+.btn-bento-primary {
+  @apply bg-brand-yellow text-black;
 }

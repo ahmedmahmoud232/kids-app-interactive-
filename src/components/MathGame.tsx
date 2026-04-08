@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Star, Trophy, RefreshCcw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { generateAdaptiveQuiz, QuizQuestion } from '../services/gemini';
+import { Star, Trophy, RefreshCcw, CheckCircle2, XCircle, Loader2, Volume2 } from 'lucide-react';
+import { generateAdaptiveQuiz, QuizQuestion, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
 interface MathGameProps {
@@ -13,95 +13,85 @@ interface MathGameProps {
 export default function MathGame({ age, level, onComplete }: MathGameProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [score, setScore] = useState(0);
+  const [showResult, setShowResult] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
-    loadQuestions();
-  }, [level]);
+    const loadQuiz = async () => {
+      const quiz = await generateAdaptiveQuiz('الرياضيات والأرقام', age, level);
+      setQuestions(quiz);
+      setLoading(false);
+      if (quiz.length > 0) {
+        handleSpeak(quiz[0].question);
+      }
+    };
+    loadQuiz();
+  }, [age, level]);
 
-  const loadQuestions = async () => {
-    setLoading(true);
-    const newQuestions = await generateAdaptiveQuiz('الرياضيات والأرقام', age, level);
-    setQuestions(newQuestions);
-    setLoading(false);
-    setCurrentIndex(0);
-    setScore(0);
-    setShowResult(false);
+  const handleSpeak = async (text: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(true);
+    const audioUrl = await speakText(text);
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => setIsSpeaking(false);
+      audio.play();
+    } else {
+      setIsSpeaking(false);
+    }
   };
 
   const handleAnswer = (option: string) => {
     if (selectedOption) return;
-    
     setSelectedOption(option);
     const correct = option === questions[currentIndex].correctAnswer;
     setIsCorrect(correct);
-    
-    if (correct) {
-      setScore(prev => prev + 10);
-    }
+    if (correct) setScore(s => s + 1);
+
+    handleSpeak(correct ? "أحسنت! إجابة صحيحة." : "حاول مرة أخرى.");
 
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
-        setCurrentIndex(prev => prev + 1);
+        setCurrentIndex(i => i + 1);
         setSelectedOption(null);
         setIsCorrect(null);
+        handleSpeak(questions[currentIndex + 1].question);
       } else {
         setShowResult(true);
       }
-    }, 2000);
+    }, 2500);
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <Loader2 className="w-12 h-12 text-brand-blue animate-spin" />
-        <p className="text-xl font-bold text-gray-500">نحن نجهز لك تحديات ممتعة...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-12 h-12 text-white animate-spin" />
+        <p className="text-2xl font-black text-white">جاري تحضير المسائل الرياضية...</p>
       </div>
     );
   }
 
   if (showResult) {
+    const totalPoints = score * 50;
     return (
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="text-center space-y-8 p-8"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bento-card p-12 text-center space-y-8 bg-white max-w-2xl mx-auto"
       >
-        <div className="relative inline-block">
-          <Trophy className="w-32 h-32 text-brand-yellow mx-auto" />
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute -top-4 -right-4 bg-brand-red text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl"
-          >
-            {score}
-          </motion.div>
-        </div>
-        
-        <div className="space-y-2">
-          <h2 className="text-4xl font-bold text-brand-purple">عمل رائع!</h2>
-          <p className="text-xl text-gray-600">لقد أكملت جميع التحديات بنجاح</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button 
-            onClick={loadQuestions}
-            className="btn-kids bg-brand-blue text-white flex items-center justify-center gap-2"
-          >
-            <RefreshCcw className="w-5 h-5" />
-            العب مرة أخرى
-          </button>
-          <button 
-            onClick={() => onComplete(score)}
-            className="btn-kids bg-brand-green text-white"
-          >
-            العودة للمغامرات
-          </button>
-        </div>
+        <Trophy className="w-24 h-24 mx-auto text-brand-yellow drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]" />
+        <h2 className="text-5xl font-black">انتهى التحدي!</h2>
+        <p className="text-2xl font-bold text-gray-500">لقد حصلت على {totalPoints} نقطة</p>
+        <button 
+          onClick={() => onComplete(totalPoints)}
+          className="btn-bento btn-bento-primary w-full text-2xl"
+        >
+          العودة للرئيسية
+        </button>
       </motion.div>
     );
   }
@@ -109,67 +99,59 @@ export default function MathGame({ age, level, onComplete }: MathGameProps) {
   const currentQuestion = questions[currentIndex];
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      {/* Progress Bar */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-            className="h-full bg-brand-blue"
-          />
+    <div className="max-w-3xl mx-auto space-y-8">
+      <div className="bento-card p-12 bg-white space-y-10 relative">
+        <div className="absolute top-4 left-4">
+          <button 
+            onClick={() => handleSpeak(currentQuestion.question)}
+            disabled={isSpeaking}
+            className={cn(
+              "p-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
+              isSpeaking ? "bg-gray-100" : "bg-brand-blue hover:bg-brand-blue/80"
+            )}
+          >
+            <Volume2 className={cn("w-6 h-6", isSpeaking && "animate-pulse")} />
+          </button>
         </div>
-        <span className="font-bold text-gray-400">{currentIndex + 1} / {questions.length}</span>
-      </div>
 
-      {/* Question Card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          className="kids-card p-8 space-y-8"
-        >
-          <h3 className="text-3xl font-bold text-center leading-relaxed">
-            {currentQuestion.question}
-          </h3>
+        <div className="text-center space-y-2">
+          <p className="text-brand-purple font-black text-xl uppercase tracking-widest">تحدي الرياضيات</p>
+          <h2 className="text-4xl font-black leading-tight">{currentQuestion.question}</h2>
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {currentQuestion.options.map((option, i) => (
-              <button
-                key={i}
-                onClick={() => handleAnswer(option)}
-                disabled={!!selectedOption}
-                className={cn(
-                  "p-6 rounded-2xl text-xl font-bold border-4 transition-all",
-                  !selectedOption && "hover:border-brand-blue hover:bg-blue-50 border-gray-100",
-                  selectedOption === option && option === currentQuestion.correctAnswer && "bg-brand-green border-brand-green text-white",
-                  selectedOption === option && option !== currentQuestion.correctAnswer && "bg-brand-red border-brand-red text-white",
-                  selectedOption && option === currentQuestion.correctAnswer && "border-brand-green bg-green-50",
-                  selectedOption && option !== currentQuestion.correctAnswer && "opacity-50"
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-
-          {selectedOption && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {currentQuestion.options.map((option, i) => (
+            <button
+              key={i}
+              onClick={() => handleAnswer(option)}
+              disabled={!!selectedOption}
               className={cn(
-                "p-4 rounded-xl flex items-center gap-3",
-                isCorrect ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                "bento-card p-6 text-2xl font-bold transition-all flex justify-between items-center",
+                selectedOption === option 
+                  ? (isCorrect ? "bg-brand-green" : "bg-brand-red")
+                  : "bg-white hover:bg-gray-50"
               )}
             >
-              {isCorrect ? <CheckCircle2 /> : <XCircle />}
-              <p className="font-medium">{currentQuestion.explanation}</p>
-            </motion.div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+              <span>{option}</span>
+              {selectedOption === option && (
+                isCorrect ? <CheckCircle2 className="w-8 h-8" /> : <XCircle className="w-8 h-8" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex justify-center gap-2">
+          {[...Array(questions.length)].map((_, i) => (
+            <div 
+              key={i} 
+              className={cn(
+                "w-12 h-3 border-2 border-black",
+                i < currentIndex ? "bg-brand-green" : i === currentIndex ? "bg-brand-yellow" : "bg-gray-100"
+              )} 
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -49,32 +49,32 @@ export default function WordBlocks({ onComplete }: WordBlocksProps) {
   }, [selectedLetters]);
 
   return (
-    <div className="kids-card p-12 text-center space-y-12">
-      <div className="space-y-4">
-        <h3 className="text-2xl font-bold text-gray-500">رتب الحروف لتكوين الكلمة</h3>
-        <div className="flex justify-center gap-4 min-h-[80px]">
+    <div className="bento-card p-12 text-center space-y-12 bg-white relative overflow-hidden">
+      <div className="space-y-6">
+        <h3 className="text-3xl font-black text-gray-400">رتب الحروف لتكوين الكلمة</h3>
+        <div className="flex justify-center gap-4 min-h-[100px]">
           {selectedLetters.map((l, i) => (
             <motion.div 
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               key={i} 
-              className="w-16 h-16 bg-brand-blue text-white rounded-xl flex items-center justify-center text-3xl font-bold shadow-lg"
+              className="w-20 h-20 bg-brand-blue text-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center text-4xl font-black"
             >
               {l}
             </motion.div>
           ))}
           {[...Array(current.word.length - selectedLetters.length)].map((_, i) => (
-            <div key={i} className="w-16 h-16 border-4 border-dashed border-gray-200 rounded-xl" />
+            <div key={i} className="w-20 h-20 border-4 border-dashed border-gray-200" />
           ))}
         </div>
       </div>
 
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center gap-6">
         {current.scrambled.map((l, i) => (
           <button
             key={i}
             onClick={() => toggleLetter(l, i)}
-            className="w-16 h-16 bg-white border-4 border-brand-blue text-brand-blue rounded-xl flex items-center justify-center text-3xl font-bold hover:scale-110 transition-transform shadow-md"
+            className="w-20 h-20 bg-white border-4 border-black text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center text-4xl font-black hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
           >
             {l}
           </button>
@@ -86,18 +86,18 @@ export default function WordBlocks({ onComplete }: WordBlocksProps) {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className={cn(
-            "flex items-center justify-center gap-2 text-2xl font-bold",
+            "flex items-center justify-center gap-4 text-4xl font-black",
             feedback === 'correct' ? "text-brand-green" : "text-brand-red"
           )}
         >
-          {feedback === 'correct' ? <CheckCircle2 className="w-8 h-8" /> : <XCircle className="w-8 h-8" />}
+          {feedback === 'correct' ? <CheckCircle2 className="w-12 h-12" /> : <XCircle className="w-12 h-12" />}
           <span>{feedback === 'correct' ? 'رائع!' : 'حاول مرة أخرى'}</span>
         </motion.div>
       )}
 
       <button 
         onClick={() => setSelectedLetters([])}
-        className="text-gray-400 hover:text-brand-red underline text-sm"
+        className="btn-bento text-lg"
       >
         مسح الحروف
       </button>

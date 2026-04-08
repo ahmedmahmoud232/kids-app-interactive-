@@ -9,12 +9,19 @@ export interface Game {
   icon: string;
 }
 
-export interface UserProfile {
+export interface ChildProfile {
+  id: string;
   name: string;
   age: number;
+  image?: string;
   level: number;
   points: number;
   progress: Record<string, number>;
+}
+
+export interface UserProfile {
+  currentChildId: string | null;
+  children: ChildProfile[];
 }
 
 export const GAMES: Game[] = [

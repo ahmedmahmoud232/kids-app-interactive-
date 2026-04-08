@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Sparkles, Loader2, ChevronRight } from 'lucide-react';
-import { generateInteractiveStory } from '../services/gemini';
+import { BookOpen, Sparkles, Loader2, ChevronRight, Volume2 } from 'lucide-react';
+import { generateInteractiveStory, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
 interface StoryTimeProps {
@@ -10,90 +10,115 @@ interface StoryTimeProps {
 }
 
 export default function StoryTime({ age, onComplete }: StoryTimeProps) {
-  const [story, setStory] = useState<string>('');
+  const [story, setStory] = useState('');
   const [loading, setLoading] = useState(true);
-  const [topic, setTopic] = useState('الفضاء والمجرات');
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  useEffect(() => {
-    loadStory();
-  }, [topic]);
+  const topics = [
+    { id: 'space', title: 'مغامرة الفضاء', icon: '🚀', color: 'bg-brand-purple' },
+    { id: 'shapes', title: 'مدينة الأشكال', icon: '📐', color: 'bg-brand-yellow' },
+    { id: 'robots', title: 'عالم الروبوتات', icon: '🤖', color: 'bg-brand-blue' },
+  ];
 
-  const loadStory = async () => {
+  const loadStory = async (topic: string) => {
     setLoading(true);
     const text = await generateInteractiveStory(topic, age);
     setStory(text);
     setLoading(false);
+    handleSpeak(text);
   };
 
-  const topics = [
-    { id: 'space', label: 'الفضاء', icon: '🚀', color: 'bg-brand-purple' },
-    { id: 'shapes', label: 'الأشكال السحرية', icon: '📐', color: 'bg-brand-blue' },
-    { id: 'robots', label: 'الروبوتات الصديقة', icon: '🤖', color: 'bg-brand-green' },
-  ];
+  const handleSpeak = async (text: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(true);
+    const audioUrl = await speakText(text);
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => setIsSpeaking(false);
+      audio.play();
+    } else {
+      setIsSpeaking(false);
+    }
+  };
+
+  if (loading && !story) {
+    return (
+      <div className="space-y-12">
+        <div className="text-center space-y-4">
+          <h1 className="text-6xl font-black text-white drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">وقت القصة</h1>
+          <p className="text-2xl font-bold text-white">اختر موضوعاً لنبدأ الحكاية</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {topics.map((topic) => (
+            <button
+              key={topic.id}
+              onClick={() => loadStory(topic.title)}
+              className={cn(
+                "bento-card p-10 flex flex-col items-center gap-6 group",
+                topic.color
+              )}
+            >
+              <span className="text-7xl group-hover:scale-110 transition-transform">{topic.icon}</span>
+              <span className="text-3xl font-black">{topic.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <Loader2 className="w-12 h-12 text-brand-green animate-spin" />
-        <p className="text-xl font-bold text-gray-500">نحن نكتب لك قصة سحرية...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-12 h-12 text-white animate-spin" />
+        <p className="text-2xl font-black text-white">جاري تأليف القصة...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-        {topics.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTopic(t.label)}
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="bento-card p-12 bg-white space-y-8 relative overflow-hidden">
+        <div className="absolute top-4 left-4">
+          <button 
+            onClick={() => handleSpeak(story)}
+            disabled={isSpeaking}
             className={cn(
-              "flex-shrink-0 px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all",
-              topic === t.label ? "bg-brand-purple text-white shadow-lg scale-105" : "bg-white text-gray-600 hover:bg-gray-50"
+              "p-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
+              isSpeaking ? "bg-gray-100" : "bg-brand-blue hover:bg-brand-blue/80"
             )}
           >
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
+            <Volume2 className={cn("w-6 h-6", isSpeaking && "animate-pulse")} />
           </button>
-        ))}
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="kids-card p-10 bg-white relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <BookOpen className="w-32 h-32" />
         </div>
 
-        <div className="relative z-10 space-y-8">
-          <div className="flex items-center gap-3 text-brand-purple">
-            <Sparkles className="w-6 h-6" />
-            <h2 className="text-2xl font-bold">قصة اليوم: {topic}</h2>
-          </div>
+        <div className="flex items-center gap-4 text-brand-purple">
+          <BookOpen className="w-10 h-10" />
+          <h2 className="text-3xl font-black">حكاية اليوم</h2>
+        </div>
 
-          <div className="prose prose-xl max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+        <div className="prose prose-2xl max-w-none">
+          <p className="text-3xl font-bold leading-relaxed text-right whitespace-pre-wrap">
             {story}
-          </div>
-
-          <div className="pt-8 border-t border-gray-100 flex justify-between items-center">
-            <button 
-              onClick={loadStory}
-              className="text-brand-blue font-bold hover:underline"
-            >
-              قصة أخرى؟
-            </button>
-            <button 
-              onClick={onComplete}
-              className="btn-kids bg-brand-purple text-white flex items-center gap-2"
-            >
-              <span>لقد استمتعت بالقصة!</span>
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          </p>
         </div>
-      </motion.div>
+
+        <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t-4 border-black border-dashed">
+          <button 
+            onClick={() => { setStory(''); setLoading(true); }}
+            className="btn-bento flex-1 text-xl"
+          >
+            قصة أخرى
+          </button>
+          <button 
+            onClick={onComplete}
+            className="btn-bento btn-bento-primary flex-1 flex items-center justify-center gap-2 text-xl"
+          >
+            لقد استمتعت بالقصة!
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -46,8 +46,8 @@ export default function MathStars({ onComplete }: MathStarsProps) {
   };
 
   return (
-    <div className="kids-card p-12 text-center space-y-8">
-      <div className="flex justify-center gap-4 text-6xl font-bold text-brand-purple">
+    <div className="bento-card p-12 text-center space-y-8 bg-white relative overflow-hidden">
+      <div className="flex justify-center gap-4 text-7xl font-black text-brand-purple drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">
         <span>{num1}</span>
         <span>+</span>
         <span>{num2}</span>
@@ -56,7 +56,7 @@ export default function MathStars({ onComplete }: MathStarsProps) {
           type="number" 
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          className="w-24 border-b-4 border-brand-purple text-center outline-none focus:border-brand-blue"
+          className="w-32 border-b-8 border-black text-center outline-none focus:border-brand-blue bg-transparent"
           autoFocus
         />
       </div>
@@ -64,7 +64,7 @@ export default function MathStars({ onComplete }: MathStarsProps) {
       <button 
         onClick={checkAnswer}
         disabled={!answer || !!feedback}
-        className="btn-kids bg-brand-blue text-white w-full max-w-xs"
+        className="btn-bento btn-bento-primary w-full max-w-md text-2xl"
       >
         تحقق من الإجابة
       </button>
@@ -74,22 +74,22 @@ export default function MathStars({ onComplete }: MathStarsProps) {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           className={cn(
-            "flex items-center justify-center gap-2 text-2xl font-bold",
+            "flex items-center justify-center gap-4 text-4xl font-black",
             feedback === 'correct' ? "text-brand-green" : "text-brand-red"
           )}
         >
-          {feedback === 'correct' ? <CheckCircle2 className="w-8 h-8" /> : <XCircle className="w-8 h-8" />}
+          {feedback === 'correct' ? <CheckCircle2 className="w-12 h-12" /> : <XCircle className="w-12 h-12" />}
           <span>{feedback === 'correct' ? 'أحسنت!' : 'حاول مرة أخرى'}</span>
         </motion.div>
       )}
 
-      <div className="flex justify-center gap-2">
+      <div className="flex justify-center gap-4">
         {[...Array(5)].map((_, i) => (
           <Star 
             key={i} 
             className={cn(
-              "w-8 h-8",
-              i < count ? "text-brand-yellow fill-current" : "text-gray-200"
+              "w-12 h-12 border-2 border-black p-1",
+              i < count ? "bg-brand-yellow text-black fill-current" : "bg-gray-100 text-gray-300"
             )} 
           />
         ))}

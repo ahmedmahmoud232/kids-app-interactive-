@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Sparkles, ChevronLeft, Play, Star, Trophy, RefreshCcw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { generateAdaptiveQuiz, QuizQuestion } from '../services/gemini';
+import { Brain, Sparkles, ChevronLeft, Play, Star, Trophy, RefreshCcw, CheckCircle2, XCircle, Loader2, Volume2 } from 'lucide-react';
+import { generateAdaptiveQuiz, QuizQuestion, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
 interface QuizSectionProps {
@@ -10,236 +10,213 @@ interface QuizSectionProps {
   onComplete: (points: number) => void;
 }
 
-const SUBJECTS = [
-  { id: 'math', label: 'الرياضيات', icon: '🔢', color: 'bg-brand-yellow', prompt: 'الرياضيات والأرقام' },
-  { id: 'science', label: 'العلوم', icon: '🪐', color: 'bg-brand-green', prompt: 'العلوم والكواكب والنجوم' },
-  { id: 'language', label: 'اللغة العربية', icon: '✍️', color: 'bg-brand-blue', prompt: 'اللغة العربية والحروف' },
-  { id: 'logic', label: 'المنطق', icon: '🧩', color: 'bg-brand-purple', prompt: 'المنطق والأشكال الهندسية' },
-];
-
 export default function QuizSection({ age, level, onComplete }: QuizSectionProps) {
-  const [selectedSubject, setSelectedSubject] = useState<typeof SUBJECTS[0] | null>(null);
+  const [subject, setSubject] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [score, setScore] = useState(0);
+  const [showResult, setShowResult] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const startQuiz = async (subject: typeof SUBJECTS[0]) => {
-    setSelectedSubject(subject);
+  const subjects = [
+    { id: 'math', title: 'الرياضيات', icon: '🔢', color: 'bg-brand-yellow' },
+    { id: 'science', title: 'العلوم', icon: '🧪', color: 'bg-brand-blue' },
+    { id: 'language', title: 'اللغة العربية', icon: '📚', color: 'bg-brand-green' },
+    { id: 'logic', title: 'المنطق', icon: '🧩', color: 'bg-brand-purple' },
+  ];
+
+  const startQuiz = async (sub: string) => {
+    setSubject(sub);
     setLoading(true);
-    const newQuestions = await generateAdaptiveQuiz(subject.prompt, age, level);
-    setQuestions(newQuestions);
+    const quiz = await generateAdaptiveQuiz(sub, age, level);
+    setQuestions(quiz);
     setLoading(false);
-    setCurrentIndex(0);
-    setScore(0);
-    setShowResult(false);
+    if (quiz.length > 0) {
+      handleSpeak(quiz[0].question);
+    }
+  };
+
+  const handleSpeak = async (text: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(true);
+    const audioUrl = await speakText(text);
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.onended = () => setIsSpeaking(false);
+      audio.play();
+    } else {
+      setIsSpeaking(false);
+    }
   };
 
   const handleAnswer = (option: string) => {
     if (selectedOption) return;
-    
     setSelectedOption(option);
     const correct = option === questions[currentIndex].correctAnswer;
     setIsCorrect(correct);
-    
-    if (correct) {
-      setScore(prev => prev + 10);
-    }
+    if (correct) setScore(s => s + 1);
+
+    handleSpeak(correct ? "أحسنت! إجابة صحيحة." : "حاول مرة أخرى في السؤال القادم.");
 
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
-        setCurrentIndex(prev => prev + 1);
+        setCurrentIndex(i => i + 1);
         setSelectedOption(null);
         setIsCorrect(null);
+        handleSpeak(questions[currentIndex + 1].question);
       } else {
         setShowResult(true);
       }
-    }, 2000);
+    }, 3000);
   };
 
-  const reset = () => {
-    setSelectedSubject(null);
-    setQuestions([]);
-    setShowResult(false);
-  };
-
-  if (!selectedSubject) {
+  if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-12 h-12 text-white animate-spin" />
+        <p className="text-2xl font-black text-white">جاري تحضير التحدي الذكي...</p>
+      </div>
+    );
+  }
+
+  if (showResult) {
+    const totalPoints = score * 50;
+    return (
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bento-card p-12 text-center space-y-8 bg-white max-w-2xl mx-auto"
+      >
+        <Trophy className="w-24 h-24 mx-auto text-brand-yellow drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]" />
+        <div className="space-y-2">
+          <h2 className="text-5xl font-black">عمل رائع!</h2>
+          <p className="text-2xl font-bold text-gray-500">لقد أجبت على {score} من {questions.length} أسئلة</p>
+        </div>
+        <div className="bento-card p-6 bg-brand-green inline-block">
+          <p className="text-3xl font-black">+{totalPoints} نقطة</p>
+        </div>
+        <button 
+          onClick={() => {
+            onComplete(totalPoints);
+            setSubject(null);
+            setShowResult(false);
+            setCurrentIndex(0);
+            setScore(0);
+          }}
+          className="btn-bento btn-bento-primary w-full text-2xl"
+        >
+          العودة للقائمة
+        </button>
+      </motion.div>
+    );
+  }
+
+  if (!subject) {
+    return (
+      <div className="space-y-12">
         <div className="text-center space-y-4">
-          <div className="inline-flex p-4 bg-brand-purple/10 rounded-full text-brand-purple mb-4">
-            <Brain className="w-12 h-12" />
-          </div>
-          <h2 className="text-4xl font-bold">تحدي الذكاء</h2>
-          <p className="text-xl text-gray-600">اختر موضوعاً لاختبار معلوماتك!</p>
+          <h1 className="text-6xl font-black text-white drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">تحدي الذكاء</h1>
+          <p className="text-2xl font-bold text-white">اختر موضوعاً لاختبار مهاراتك</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {SUBJECTS.map((subject) => (
-            <motion.button
-              key={subject.id}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => startQuiz(subject)}
-              className="kids-card p-8 flex items-center gap-6 text-right group"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          {subjects.map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => startQuiz(sub.title)}
+              className={cn(
+                "bento-card p-10 flex flex-col items-center gap-6 group",
+                sub.color
+              )}
             >
-              <div className={cn("w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-inner", subject.color)}>
-                {subject.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-1">{subject.label}</h3>
-                <p className="text-gray-500">تحديات ممتعة في {subject.label}</p>
-              </div>
-              <Play className="w-6 h-6 text-gray-300 group-hover:text-brand-purple transition-colors" />
-            </motion.button>
+              <span className="text-7xl group-hover:scale-110 transition-transform">{sub.icon}</span>
+              <span className="text-4xl font-black">{sub.title}</span>
+            </button>
           ))}
         </div>
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-6">
-        <div className="relative">
-          <Loader2 className="w-16 h-16 text-brand-purple animate-spin" />
-          <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-brand-yellow animate-pulse" />
-        </div>
-        <p className="text-2xl font-bold text-gray-600">نحن نجهز لك أسئلة ذكية...</p>
-      </div>
-    );
-  }
-
-  if (showResult) {
-    return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="kids-card p-12 text-center space-y-8 max-w-2xl mx-auto"
-      >
-        <div className="relative inline-block">
-          <Trophy className="w-32 h-32 text-brand-yellow mx-auto" />
-          <motion.div 
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute -top-4 -right-4 bg-brand-red text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl"
-          >
-            {score}
-          </motion.div>
-        </div>
-        
-        <div className="space-y-2">
-          <h2 className="text-4xl font-bold text-brand-purple">رائع جداً!</h2>
-          <p className="text-xl text-gray-600">لقد أتممت تحدي {selectedSubject.label}</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button 
-            onClick={() => startQuiz(selectedSubject)}
-            className="btn-kids bg-brand-blue text-white flex items-center justify-center gap-2"
-          >
-            <RefreshCcw className="w-5 h-5" />
-            حاول مرة أخرى
-          </button>
-          <button 
-            onClick={() => {
-              onComplete(score);
-              reset();
-            }}
-            className="btn-kids bg-brand-green text-white"
-          >
-            العودة للمواضيع
-          </button>
-        </div>
-      </motion.div>
-    );
-  }
-
   const currentQuestion = questions[currentIndex];
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <button 
-          onClick={reset}
-          className="flex items-center gap-2 text-gray-500 hover:text-brand-purple font-bold"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          <span>تغيير الموضوع</span>
-        </button>
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
-          <span className="text-2xl">{selectedSubject.icon}</span>
-          <span className="font-bold">{selectedSubject.label}</span>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-            className={cn("h-full", selectedSubject.color.replace('bg-', 'bg-opacity-100 bg-'))}
-            style={{ backgroundColor: 'var(--color-brand-purple)' }}
-          />
-        </div>
-        <span className="font-bold text-gray-400">{currentIndex + 1} / {questions.length}</span>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="kids-card p-10 space-y-10"
-        >
-          <h3 className="text-3xl font-bold text-center leading-relaxed">
-            {currentQuestion?.question}
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {currentQuestion?.options.map((option, i) => (
-              <button
-                key={i}
-                onClick={() => handleAnswer(option)}
-                disabled={!!selectedOption}
-                className={cn(
-                  "p-6 rounded-2xl text-xl font-bold border-4 transition-all text-center",
-                  !selectedOption && "hover:border-brand-purple hover:bg-purple-50 border-gray-100",
-                  selectedOption === option && option === currentQuestion.correctAnswer && "bg-brand-green border-brand-green text-white",
-                  selectedOption === option && option !== currentQuestion.correctAnswer && "bg-brand-red border-brand-red text-white",
-                  selectedOption && option === currentQuestion.correctAnswer && "border-brand-green bg-green-50",
-                  selectedOption && option !== currentQuestion.correctAnswer && "opacity-50"
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-
-          {selectedOption && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+    <div className="max-w-3xl mx-auto space-y-8">
+      <div className="flex justify-between items-center text-white font-black text-2xl">
+        <span>السؤال {currentIndex + 1} من {questions.length}</span>
+        <div className="flex gap-2">
+          {[...Array(questions.length)].map((_, i) => (
+            <div 
+              key={i} 
               className={cn(
-                "p-6 rounded-2xl flex items-start gap-4",
-                isCorrect ? "bg-green-50 text-green-800 border-2 border-green-100" : "bg-red-50 text-red-800 border-2 border-red-100"
+                "w-4 h-4 border-2 border-black",
+                i < currentIndex ? "bg-brand-green" : i === currentIndex ? "bg-brand-yellow" : "bg-white/20"
+              )} 
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="bento-card p-12 bg-white space-y-10 relative overflow-hidden">
+        <div className="absolute top-4 left-4">
+          <button 
+            onClick={() => handleSpeak(currentQuestion.question)}
+            disabled={isSpeaking}
+            className={cn(
+              "p-3 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all",
+              isSpeaking ? "bg-gray-100" : "bg-brand-blue hover:bg-brand-blue/80"
+            )}
+          >
+            <Volume2 className={cn("w-6 h-6", isSpeaking && "animate-pulse")} />
+          </button>
+        </div>
+
+        <h2 className="text-4xl font-black text-center leading-tight pt-4">
+          {currentQuestion.question}
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4">
+          {currentQuestion.options.map((option, i) => (
+            <button
+              key={i}
+              onClick={() => handleAnswer(option)}
+              disabled={!!selectedOption}
+              className={cn(
+                "bento-card p-6 text-2xl font-bold text-right transition-all flex justify-between items-center",
+                selectedOption === option 
+                  ? (isCorrect ? "bg-brand-green" : "bg-brand-red")
+                  : "bg-white hover:bg-gray-50"
               )}
             >
-              <div className={cn("p-2 rounded-full", isCorrect ? "bg-green-200" : "bg-red-200")}>
-                {isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-              </div>
-              <div className="space-y-1">
-                <p className="font-bold text-lg">{isCorrect ? 'إجابة صحيحة!' : 'حاول مرة أخرى في المرة القادمة'}</p>
-                <p className="opacity-90">{currentQuestion.explanation}</p>
-              </div>
+              <span>{option}</span>
+              {selectedOption === option && (
+                isCorrect ? <CheckCircle2 className="w-8 h-8" /> : <XCircle className="w-8 h-8" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <AnimatePresence>
+          {selectedOption && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "p-6 border-2 border-black font-bold text-xl",
+                isCorrect ? "bg-brand-green/10" : "bg-brand-red/10"
+              )}
+            >
+              <p className="flex items-center gap-2">
+                <Sparkles className="w-6 h-6" />
+                {currentQuestion.explanation}
+              </p>
             </motion.div>
           )}
-        </motion.div>
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

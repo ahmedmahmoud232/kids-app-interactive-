@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { STATIC_QUIZZES, STATIC_STORIES } from "../constants/staticContent";
 
 const apiKey = process.env.GEMINI_API_KEY || "";
@@ -9,6 +9,34 @@ export interface QuizQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
+}
+
+export async function speakText(text: string): Promise<string | null> {
+  if (!ai) return null;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `تحدث بصوت رجل واضح وهادئ: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore is a male voice
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      return `data:audio/wav;base64,${base64Audio}`;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating speech:", error);
+    return null;
+  }
 }
 
 export async function generateAdaptiveQuiz(subject: string, age: number, level: number): Promise<QuizQuestion[]> {
