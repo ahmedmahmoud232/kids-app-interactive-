@@ -22,7 +22,6 @@ export interface ChildProfile {
 export interface UserProfile {
   currentChildId: string | null;
   children: ChildProfile[];
-  fcmToken?: string;
 }
 
 export const GAMES: Game[] = [

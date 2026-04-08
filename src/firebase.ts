@@ -7,30 +7,12 @@ import {
   User
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, orderBy, limit, addDoc, Timestamp } from 'firebase/firestore';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 export const googleProvider = new GoogleAuthProvider();
-
-export const requestNotificationPermission = async () => {
-  if (!messaging) return null;
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const token = await getToken(messaging, {
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY // User needs to set this
-      });
-      return token;
-    }
-  } catch (error) {
-    console.error('Notification permission error:', error);
-  }
-  return null;
-};
 
 export enum OperationType {
   CREATE = 'create',
