@@ -4,6 +4,18 @@ import { Star, Trophy, RefreshCcw, CheckCircle2, XCircle, Loader2, Volume2 } fro
 import { generateAdaptiveQuiz, QuizQuestion, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
+// Sound Utility
+const playSound = (type: 'click' | 'success' | 'error') => {
+  const sounds = {
+    click: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    success: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
+    error: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3'
+  };
+  const audio = new Audio(sounds[type]);
+  audio.volume = 0.4;
+  audio.play().catch(() => {});
+};
+
 interface MathGameProps {
   age: number;
   level: number;
@@ -50,7 +62,12 @@ export default function MathGame({ age, level, onComplete }: MathGameProps) {
     setSelectedOption(option);
     const correct = option === questions[currentIndex].correctAnswer;
     setIsCorrect(correct);
-    if (correct) setScore(s => s + 1);
+    if (correct) {
+      setScore(s => s + 1);
+      playSound('success');
+    } else {
+      playSound('error');
+    }
 
     handleSpeak(correct ? "أحسنت! إجابة صحيحة." : "حاول مرة أخرى.");
 

@@ -74,5 +74,25 @@ export const GAMES: Game[] = [
     maxAge: 8,
     color: 'bg-brand-red',
     icon: 'Languages'
+  },
+  {
+    id: 'space-explorer',
+    title: 'مستكشف الفضاء',
+    description: 'تعرف على الكواكب والمجرات في رحلة ممتعة',
+    category: 'science',
+    minAge: 7,
+    maxAge: 13,
+    color: 'bg-brand-blue',
+    icon: 'Star'
+  },
+  {
+    id: 'creative-art',
+    title: 'الفنان الصغير',
+    description: 'تعلم الألوان والأشكال من خلال الرسم',
+    category: 'logic',
+    minAge: 4,
+    maxAge: 8,
+    color: 'bg-brand-yellow',
+    icon: 'Square'
   }
 ];

@@ -22,7 +22,9 @@ import {
   User,
   Volume2,
   LogIn,
-  Loader2
+  Loader2,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { GAMES, UserProfile, ChildProfile } from './types';
@@ -34,7 +36,20 @@ import WordBlocks from './components/games/WordBlocks';
 import { speakText } from './services/gemini';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+
+// Sound Utility
+const playSound = (type: 'click' | 'success' | 'pop' | 'level-up') => {
+  const sounds = {
+    click: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    success: 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3',
+    pop: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3',
+    'level-up': 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'
+  };
+  const audio = new Audio(sounds[type]);
+  audio.volume = 0.4;
+  audio.play().catch(() => {}); // Ignore autoplay blocks
+};
 
 const IconMap: Record<string, any> = {
   Star,
@@ -87,7 +102,9 @@ const AbstractShapes = () => (
 );
 
 // Pages
-const Home = ({ currentChild }: { currentChild: ChildProfile | null }) => {
+const Home = ({ currentChild, games }: { currentChild: ChildProfile | null, games: any[] }) => {
+  const navigate = useNavigate();
+
   if (!currentChild) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
@@ -117,17 +134,45 @@ const Home = ({ currentChild }: { currentChild: ChildProfile | null }) => {
         <p className="text-2xl font-bold text-white drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
           مستعد لمغامرة جديدة في سن الـ {currentChild.age}؟
         </p>
+        
+        <div className="flex justify-center gap-4 mt-8">
+          <button 
+            onClick={() => {
+              playSound('click');
+              const availableGames = games.filter(g => currentChild.age >= g.minAge && currentChild.age <= g.maxAge);
+              if (availableGames.length > 0) {
+                const randomGame = availableGames[Math.floor(Math.random() * availableGames.length)];
+                navigate(`/game/${randomGame.id}`);
+              }
+            }}
+            className="btn-bento btn-bento-primary flex items-center gap-2 text-xl px-10"
+          >
+            <Play className="w-6 h-6 fill-current" />
+            لعب سريع
+          </button>
+          <Link 
+            to="/quizzes"
+            onClick={() => playSound('click')}
+            className="btn-bento bg-brand-purple text-white flex items-center gap-2 text-xl px-10"
+          >
+            <Brain className="w-6 h-6" />
+            تحدي اليوم
+          </Link>
+        </div>
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {GAMES.filter(g => currentChild.age >= g.minAge && currentChild.age <= g.maxAge).map((game, index) => {
+        {games.filter(g => currentChild.age >= g.minAge && currentChild.age <= g.maxAge).map((game, index) => {
           const Icon = IconMap[game.icon] || Gamepad2;
           return (
             <motion.div
               key={game.id}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.05, rotate: 1 }}
+              whileTap={{ scale: 0.95 }}
               transition={{ delay: index * 0.1 }}
+              onClick={() => playSound('click')}
             >
               <Link to={`/game/${game.id}`} className="block group">
                 <div className={cn(
@@ -155,13 +200,13 @@ const Home = ({ currentChild }: { currentChild: ChildProfile | null }) => {
   );
 };
 
-const GameView = ({ currentChild, onUpdateProgress }: { currentChild: ChildProfile | null, onUpdateProgress: (points: number) => void }) => {
+const GameView = ({ currentChild, games, onUpdateProgress }: { currentChild: ChildProfile | null, games: any[], onUpdateProgress: (points: number) => void }) => {
   const { id } = useParams();
-  const game = GAMES.find(g => g.id === id);
+  const game = games.find(g => g.id === id);
   const navigate = useNavigate();
   const [isPlaying, setIsPlaying] = useState(false);
 
-  if (!currentChild) return <Home currentChild={null} />;
+  if (!currentChild) return <Home currentChild={null} games={games} />;
   if (!game) return (
     <div className="text-center py-20 space-y-4">
       <h2 className="text-3xl font-bold text-white">عذراً، اللعبة غير موجودة</h2>
@@ -227,7 +272,10 @@ const GameView = ({ currentChild, onUpdateProgress }: { currentChild: ChildProfi
         <div className="w-full max-w-md p-8 bg-gray-50 border-4 border-black border-dashed text-center">
           <p className="text-2xl font-bold text-gray-600 mb-6">هل أنت مستعد يا {currentChild.name}؟</p>
           <button 
-            onClick={() => setIsPlaying(true)}
+            onClick={() => {
+              playSound('pop');
+              setIsPlaying(true);
+            }}
             className="btn-bento btn-bento-primary w-full flex items-center justify-center gap-2 text-2xl"
           >
             <Play className="w-8 h-8 fill-current" />
@@ -243,10 +291,12 @@ const ParentDashboard = ({ user, setUser }: { user: UserProfile, setUser: React.
   const [newChildName, setNewChildName] = useState('');
   const [newChildAge, setNewChildAge] = useState(4);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const addChild = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChildName) return;
+    playSound('pop');
 
     const newChild: ChildProfile = {
       id: Math.random().toString(36).substr(2, 9),
@@ -271,6 +321,25 @@ const ParentDashboard = ({ user, setUser }: { user: UserProfile, setUser: React.
       setNewChildName('');
       setNewChildAge(4);
       setShowAddForm(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
+    }
+  };
+
+  const deleteChild = async (id: string) => {
+    playSound('click');
+    const updatedUser = {
+      ...user,
+      children: user.children.filter(c => c.id !== id),
+      currentChildId: user.currentChildId === id ? (user.children.find(c => c.id !== id)?.id || null) : user.currentChildId
+    };
+
+    try {
+      if (auth.currentUser) {
+        await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUser);
+      }
+      setUser(updatedUser);
+      setDeleteConfirmId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${auth.currentUser?.uid}`);
     }
@@ -332,32 +401,74 @@ const ParentDashboard = ({ user, setUser }: { user: UserProfile, setUser: React.
         {/* Children List */}
         <div className="lg:col-span-1 space-y-6">
           <h3 className="text-3xl font-black text-white drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">الأطفال</h3>
-          <div className="space-y-4">
+            <div className="space-y-4">
             {user.children.map(child => (
-              <button
-                key={child.id}
-                onClick={async () => {
-                  const updatedUser = { ...user, currentChildId: child.id };
-                  if (auth.currentUser) {
-                    await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUser);
-                  }
-                  setUser(updatedUser);
-                }}
-                className={cn(
-                  "bento-card p-6 w-full flex items-center gap-4 text-right",
-                  user.currentChildId === child.id ? "bg-brand-yellow" : "bg-white"
-                )}
-              >
-                <div className="w-12 h-12 bg-brand-purple border-2 border-black flex items-center justify-center text-white">
-                  <User className="w-8 h-8" />
-                </div>
-                <div>
-                  <p className="text-xl font-black">{child.name}</p>
-                  <p className="font-bold text-gray-600">{child.age} سنوات</p>
-                </div>
-              </button>
+              <div key={child.id} className="relative group">
+                <button
+                  onClick={async () => {
+                    playSound('click');
+                    const updatedUser = { ...user, currentChildId: child.id };
+                    if (auth.currentUser) {
+                      await setDoc(doc(db, 'users', auth.currentUser.uid), updatedUser);
+                    }
+                    setUser(updatedUser);
+                  }}
+                  className={cn(
+                    "bento-card p-6 w-full flex items-center gap-4 text-right transition-all",
+                    user.currentChildId === child.id ? "bg-brand-yellow" : "bg-white hover:bg-gray-50"
+                  )}
+                >
+                  <div className="w-12 h-12 bg-brand-purple border-2 border-black flex items-center justify-center text-white">
+                    <User className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xl font-black">{child.name}</p>
+                    <p className="font-bold text-gray-600">{child.age} سنوات</p>
+                  </div>
+                </button>
+                <button 
+                  onClick={() => setDeleteConfirmId(child.id)}
+                  className="absolute -top-2 -left-2 p-2 bg-brand-red text-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             ))}
           </div>
+
+          {/* Delete Confirmation Modal */}
+          <AnimatePresence>
+            {deleteConfirmId && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bento-card p-8 bg-white max-w-sm w-full space-y-6"
+                >
+                  <div className="flex items-center gap-4 text-brand-red">
+                    <AlertCircle className="w-10 h-10" />
+                    <h3 className="text-2xl font-black">هل أنت متأكد؟</h3>
+                  </div>
+                  <p className="text-gray-600 font-bold">سيتم حذف جميع بيانات هذا الطفل بشكل نهائي.</p>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => deleteChild(deleteConfirmId)}
+                      className="btn-bento bg-brand-red text-white flex-1"
+                    >
+                      حذف
+                    </button>
+                    <button 
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="btn-bento bg-gray-200 flex-1"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Current Child Stats */}
@@ -415,13 +526,33 @@ export default function App() {
     currentChildId: null,
     children: []
   });
+  const [games, setGames] = useState<any[]>(GAMES);
   const [loading, setLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const gamesSnap = await getDocs(collection(db, 'games'));
+        if (!gamesSnap.empty) {
+          const gamesData = gamesSnap.docs.map(doc => doc.data());
+          setGames(gamesData);
+        } else if (auth.currentUser?.email === "ahmedmahmoud22990@gmail.com") {
+          // Seed games if empty and user is admin
+          for (const game of GAMES) {
+            await setDoc(doc(db, 'games', game.id), game);
+          }
+          setGames(GAMES);
+        }
+      } catch (error) {
+        console.error("Error fetching games:", error);
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setFirebaseUser(fUser);
       if (fUser) {
+        fetchGames();
         try {
           const docRef = doc(db, 'users', fUser.uid);
           const docSnap = await getDoc(docRef);
@@ -435,6 +566,8 @@ export default function App() {
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${fUser.uid}`);
         }
+      } else {
+        setGames(GAMES); // Fallback to hardcoded games
       }
       setLoading(false);
     });
@@ -446,15 +579,24 @@ export default function App() {
   const updateProgress = async (points: number) => {
     if (!user.currentChildId || !firebaseUser) return;
     
+    playSound('success');
+    
     const updatedUser = {
       ...user,
       children: user.children.map(c => {
         if (c.id === user.currentChildId) {
           const newPoints = c.points + points;
+          const oldLevel = c.level;
+          const newLevel = Math.floor(newPoints / 500) + 1;
+          
+          if (newLevel > oldLevel) {
+            playSound('level-up');
+          }
+
           return {
             ...c,
             points: newPoints,
-            level: Math.floor(newPoints / 500) + 1
+            level: newLevel
           };
         }
         return c;
@@ -472,8 +614,15 @@ export default function App() {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login Error:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        alert("خطأ: هذا النطاق (Domain) غير مصرح له بتسجيل الدخول. يرجى إضافة رابط الموقع إلى قائمة 'Authorized Domains' في Firebase Console.");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        // Ignore
+      } else {
+        alert("حدث خطأ أثناء تسجيل الدخول: " + error.message);
+      }
     }
   };
 
@@ -563,13 +712,13 @@ export default function App() {
           <main className="flex-1 max-w-7xl mx-auto px-4 py-12 w-full relative">
             <AnimatePresence mode="wait">
               <Routes>
-                <Route path="/" element={<Home currentChild={currentChild} />} />
-                <Route path="/games" element={<Home currentChild={currentChild} />} />
-                <Route path="/game/:id" element={<GameView currentChild={currentChild} onUpdateProgress={updateProgress} />} />
+                <Route path="/" element={<Home currentChild={currentChild} games={games} />} />
+                <Route path="/games" element={<Home currentChild={currentChild} games={games} />} />
+                <Route path="/game/:id" element={<GameView currentChild={currentChild} games={games} onUpdateProgress={updateProgress} />} />
                 <Route path="/quizzes" element={<QuizSection age={currentChild?.age || 6} level={currentChild?.level || 1} onComplete={updateProgress} />} />
                 <Route path="/parent" element={<ParentDashboard user={user} setUser={setUser} />} />
                 <Route path="/stories" element={<StoryTime age={currentChild?.age || 6} onComplete={() => updateProgress(20)} />} />
-                <Route path="*" element={<Home currentChild={currentChild} />} />
+                <Route path="*" element={<Home currentChild={currentChild} games={games} />} />
               </Routes>
             </AnimatePresence>
           </main>

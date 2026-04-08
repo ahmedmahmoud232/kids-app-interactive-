@@ -32,6 +32,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.email == "ahmedmahmoud22990@gmail.com" && request.auth.token.email_verified == true);
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['children']) &&
              data.children is list &&
@@ -39,20 +44,28 @@ service cloud.firestore {
              (!('currentChildId' in data) || data.currentChildId is string);
     }
 
+    function isValidGame(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'category', 'minAge', 'maxAge', 'color', 'icon']) &&
+             data.title is string && data.title.size() <= 100 &&
+             data.category in ['math', 'language', 'science', 'logic'];
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
-      // Users can only read and write their own profile
-      // We block public read to protect PII (even if not explicitly stored yet, it's good practice)
       allow read: if isOwner(userId);
-      
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      
       allow update: if isOwner(userId) && isValidUser(request.resource.data);
-      
       allow delete: if isOwner(userId);
+    }
+
+    match /games/{gameId} {
+      // Everyone can read games
+      allow read: if true;
+      // Only admin can manage games
+      allow write: if isAdmin() && isValidGame(request.resource.data);
     }
 
     // Default deny

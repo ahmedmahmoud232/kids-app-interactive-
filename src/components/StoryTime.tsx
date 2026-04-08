@@ -4,6 +4,17 @@ import { BookOpen, Sparkles, Loader2, ChevronRight, Volume2 } from 'lucide-react
 import { generateInteractiveStory, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
+// Sound Utility
+const playSound = (type: 'click' | 'pop') => {
+  const sounds = {
+    click: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    pop: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'
+  };
+  const audio = new Audio(sounds[type]);
+  audio.volume = 0.4;
+  audio.play().catch(() => {});
+};
+
 interface StoryTimeProps {
   age: number;
   onComplete: () => void;
@@ -21,6 +32,7 @@ export default function StoryTime({ age, onComplete }: StoryTimeProps) {
   ];
 
   const loadStory = async (topic: string) => {
+    playSound('click');
     setLoading(true);
     const text = await generateInteractiveStory(topic, age);
     setStory(text);
@@ -105,13 +117,20 @@ export default function StoryTime({ age, onComplete }: StoryTimeProps) {
 
         <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t-4 border-black border-dashed">
           <button 
-            onClick={() => { setStory(''); setLoading(true); }}
+            onClick={() => { 
+              playSound('pop');
+              setStory(''); 
+              setLoading(true); 
+            }}
             className="btn-bento flex-1 text-xl"
           >
             قصة أخرى
           </button>
           <button 
-            onClick={onComplete}
+            onClick={() => {
+              playSound('click');
+              onComplete();
+            }}
             className="btn-bento btn-bento-primary flex-1 flex items-center justify-center gap-2 text-xl"
           >
             لقد استمتعت بالقصة!
