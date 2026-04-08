@@ -24,7 +24,9 @@ import {
   LogIn,
   Loader2,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { GAMES, UserProfile, ChildProfile } from './types';
@@ -144,7 +146,7 @@ const Home = ({ currentChild, games, aiConnected }: { currentChild: ChildProfile
           </div>
         )}
         
-        <div className="flex justify-center gap-4 mt-8">
+        <div className="flex flex-wrap justify-center gap-4 mt-8">
           <button 
             onClick={() => {
               playSound('click');
@@ -159,6 +161,18 @@ const Home = ({ currentChild, games, aiConnected }: { currentChild: ChildProfile
             <Play className="w-6 h-6 fill-current" />
             لعب سريع
           </button>
+          
+          <button 
+            onClick={() => {
+              playSound('pop');
+              navigate('/stories', { state: { autoLoad: 'عالم الروبوتات' } });
+            }}
+            className="btn-bento bg-brand-blue text-white flex items-center gap-2 text-xl px-10"
+          >
+            <Bot className="w-6 h-6" />
+            قصة روبوت
+          </button>
+
           <Link 
             to="/quizzes"
             onClick={() => playSound('click')}
@@ -542,11 +556,21 @@ export default function App() {
 
   useEffect(() => {
     const checkAI = async () => {
-      const connected = await isAIConnected();
-      setAiConnected(connected);
+      try {
+        const connected = await isAIConnected();
+        setAiConnected(connected);
+      } catch (error) {
+        console.error("AI Connection check failed:", error);
+        setAiConnected(false);
+      }
     };
     checkAI();
+    
+    const interval = setInterval(checkAI, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
+  useEffect(() => {
     const fetchGames = async () => {
       try {
         const gamesSnap = await getDocs(collection(db, 'games'));
@@ -554,7 +578,6 @@ export default function App() {
           const gamesData = gamesSnap.docs.map(doc => doc.data());
           setGames(gamesData);
         } else if (auth.currentUser?.email === "ahmedmahmoud22990@gmail.com") {
-          // Seed games if empty and user is admin
           for (const game of GAMES) {
             await setDoc(doc(db, 'games', game.id), game);
           }

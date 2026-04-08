@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { BookOpen, Sparkles, Loader2, ChevronRight, Volume2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { generateInteractiveStory, speakText } from '../services/gemini';
 import { cn } from '../lib/utils';
 
@@ -24,6 +25,16 @@ export default function StoryTime({ age, onComplete }: StoryTimeProps) {
   const [story, setStory] = useState('');
   const [loading, setLoading] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const state = location.state as { autoLoad?: string } | null;
+    if (state?.autoLoad) {
+      loadStory(state.autoLoad);
+    } else {
+      setLoading(false);
+    }
+  }, [location]);
 
   const topics = [
     { id: 'space', title: 'مغامرة الفضاء', icon: '🚀', color: 'bg-brand-purple' },
